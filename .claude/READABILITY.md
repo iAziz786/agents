@@ -1,218 +1,433 @@
-### **Core Philosophy: Readability is the Sovereign Principle**
+## Writing Readable, Maintainable Code
 
-Your absolute, number-one priority is to generate code that is **supremely readable, clear, and maintainable.**
+### Core Philosophy
 
-To achieve this, you will **default to a declarative programming style.** Your code should describe the desired outcome (*what*) rather than dictating the step-by-step execution flow (*how*). This approach usually leads to more expressive and self-documenting code.
+Write code as if the person maintaining it is a violent psychopath who knows where you live. More practically:
 
-This is especially true for **shell scripting**, where imperative logic quickly becomes unreadable.
+1. **Optimize for readability by default**. Performance optimizations only when explicitly requested.
+2. **Code for teams**: Assume multiple developers will read, modify, and debug this code.
+3. **Progressive complexity**: Start simple, add complexity only when needed.
+4. **Explicit is better than implicit**: Make intentions clear, avoid magic.
 
-However, you must understand that declarative programming is a *tool* to achieve readability, not the goal itself. Therefore, you will adhere to these critical principles:
+### Universal Principles
 
-1.  **Readability Trumps Pure Declarativeness:** If a declarative abstraction, function chain, or library usage makes the code *harder* to understand than a simple, direct approach (like a well-structured `for` loop with clear variable names), you **MUST** choose the more readable, direct approach. This is the most important exception.
-2.  **Performance-Critical Paths:** In rare cases where a declarative method causes a significant, proven performance issue, you may use a more performant imperative solution. You must comment on why this trade-off was made.
-3.  **Avoid Over-Abstraction:** Do not be "declarative for the sake of being declarative." If a simple language feature is more concise and understandable than a complex library-based solution, choose simplicity.
-
-### **Leveraging External Packages**
-
-When appropriate, you should **actively use well-regarded external packages** to delegate complex logic. A library with a clean, declarative API allows your application code to become a simple statement of intent.
-
-When using an external package, ensure it meets these criteria:
-
-  * **Good Reputation:** Widely used and respected in its ecosystem.
-  * **Active Maintenance & Security:** Regularly updated, with a commitment from maintainers to address security issues.
-
-### **Guideline for Scripting**
-
-  * **Shell Script:** Use for simple, linear tasks: command pipelines, file operations. Leverage the declarative nature of tools like `find`, `grep`, `rsync`, and `xargs`.
-  * **Python:** Default to Python for any script requiring complex logic, data structures, error handling, or API interactions. Use its rich ecosystem to keep the script clean and robust.
-
------
-
-### **Code Examples: The Hierarchy of Styles**
-
-### **1. Good Declarative Code (The Goal)**
-
-This is the ideal. The code is clean, expressive, and leverages powerful tools or features to state its intent clearly.
-
-#### **Go: Simple HTTP Server**
-
-*Library: Standard Library (`net/http`)*
-
-```go
-// GOOD: The standard library declaratively maps routes to handler functions.
-package main
-import ("fmt"; "log"; "net/http")
-
-func helloHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Hello, World!")
-}
-
-func main() {
-	// Declaratively state that the "/hello" path is handled by helloHandler.
-	http.HandleFunc("/hello", helloHandler)
-
-	log.Println("Starting server on :8080")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
-		log.Fatalf("Server failed to start: %v", err)
-	}
-}
-```
-
-#### **Python: Filesystem Operations**
-
-*Library: Standard Library (`pathlib`)*
-
+#### 1. Naming Conventions
 ```python
-# GOOD: An object-oriented, declarative way to handle filesystem paths.
-from pathlib import Path
+# BAD: Ambiguous, abbreviated
+def proc_usr_data(u, t):
+    return u.get_info() if t > 0 else None
 
-# Declaratively create a path and its parents, then write to a file.
-p = Path("data/2025/reports")
-p.mkdir(parents=True, exist_ok=True)
-report_file = p / "january.txt"
-report_file.write_text("This is the January report.")
-
-print(f"File created: {report_file.exists()}")
-print(f"Contents: {report_file.read_text()}")
+# GOOD: Self-documenting
+def fetch_user_profile(user_id: str, timeout_seconds: int) -> Optional[UserProfile]:
+    if timeout_seconds <= 0:
+        return None
+    return user_service.get_profile(user_id)
 ```
 
-#### **Node.js: Making API Calls**
+#### 2. Function Design - Start Simple, Scale Up
 
-*Library: [axios](https://github.com/axios/axios)*
-
-```javascript
-// GOOD: Declaratively describes an HTTP GET request.
-const axios = require('axios');
-
-async function getUser(id) {
-  try {
-    const response = await axios.get(`https://jsonplaceholder.typicode.com/users/${id}`);
-    console.log('User found:', response.data.name);
-  } catch (error) {
-    console.error('Error fetching user:', error.message);
-  }
+**Simple Flow Example**:
+```typescript
+// Level 1: Basic validation
+function isValidEmail(email: string): boolean {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
 }
 
-getUser(1);
-```
-
-#### **Shell: Synchronizing Directories**
-
-```shell
-# GOOD: Declaratively defines the desired state of the destination directory.
-# 'archive mode', 'verbose', 'compress', 'delete extraneous files'
-rsync -avz --delete /path/to/source/ /path/to/destination/
-```
-
------
-
-### **2. When Readability Trumps Pure Declarativeness (The Exception)**
-
-This is the most nuanced category. In these cases, a direct, even slightly imperative, approach is **better** because the purely declarative version would be more confusing.
-
-#### **Go: Complex Loop Logic**
-
-```go
-// READABLE > DECLARATIVE: A for loop is clearer than a complex filter predicate.
-// Task: Find the first active admin, but log a warning for a legacy admin.
-package main
-import "fmt"
-type User struct { Name string; IsActive bool; IsAdmin bool }
-
-func findEligibleAdmin(users []User) *User {
-	for i := range users {
-		user := &users[i] // Use pointer to avoid copying
-		if user.Name == "legacy_admin" {
-			fmt.Println("Warning: Found legacy admin, skipping.")
-			continue // Simple, direct control flow
-		}
-		if user.IsActive && user.IsAdmin {
-			fmt.Println("Found eligible admin.")
-			return user // Simple, direct exit
-		}
-	}
-	return nil
+// Level 2: Add context and error details
+interface ValidationResult {
+    isValid: boolean;
+    errors: string[];
 }
-// A declarative `funk.Find()` would require a single, complex lambda with side effects
-// (the logging), making it less clean than this straightforward loop.
-```
 
-#### **Python: Multi-Step Data Transformation**
-
-```python
-# READABLE > DECLARATIVE: A loop with intermediate variables is easier to debug.
-# Task: Process transactions, enriching and filtering at each step.
-def process_transactions(transactions, user_db):
-    processed = []
-    for tx in transactions:
-        # Step 1: Enrich with user data
-        user_info = user_db.get(tx['user_id'])
-        if not user_info:
-            continue # Clear and simple skip
-
-        tx_with_user = tx | {"user_name": user_info["name"]}
-
-        # Step 2: Filter out small transactions
-        if tx_with_user['amount'] < 10.00:
-            continue
-
-        # Step 3: Add a processing flag
-        tx_with_user["processed"] = True
-        processed.append(tx_with_user)
-
-    return processed
-# A single, long declarative chain of map/filter would be dense and hard to inspect.
-# This imperative loop is clear, maintainable, and easy to debug step-by-step.
-```
-
-#### **Node.js: Complex Async Error Handling**
-
-```javascript
-// READABLE > DECLARATIVE: async/await with try/catch is clearer for complex error logic.
-async function fetchDataWithRetry(url) {
-  try {
-    return await axios.get(url);
-  } catch (error) {
-    // A nested promise chain with .catch() would be much harder to read here.
-    if (error.response && error.response.status === 401) {
-      console.log('Token expired. Refreshing token...');
-      // await refreshToken();
-      // return await axios.get(url); // Retry logic
-    } else if (error.response && error.response.status === 404) {
-      console.log('Resource not found. Returning null.');
-      return null;
-    } else {
-      // For all other errors, re-throw to be handled by the caller.
-      throw new Error(`Unhandled network error: ${error.message}`);
+function validateEmail(email: string): ValidationResult {
+    const errors: string[] = [];
+    
+    if (!email) {
+        errors.push("Email is required");
+    } else if (!email.includes("@")) {
+        errors.push("Email must contain @ symbol");
+    } else if (!isValidEmailFormat(email)) {
+        errors.push("Invalid email format");
     }
-  }
+    
+    return {
+        isValid: errors.length === 0,
+        errors
+    };
+}
+
+// Level 3: Complex business logic with multiple validators
+class EmailValidator {
+    private validators: EmailValidationRule[] = [
+        new FormatValidator(),
+        new DomainWhitelistValidator(allowedDomains),
+        new DisposableEmailValidator(),
+        new MXRecordValidator()
+    ];
+    
+    async validate(email: string): Promise<ValidationResult> {
+        const results = await Promise.all(
+            this.validators.map(v => v.validate(email))
+        );
+        
+        return ValidationResult.merge(results);
+    }
 }
 ```
 
-#### **Shell: Conditional Scripting Based on Exit Codes**
+### Domain-Specific Patterns
 
-```shell
-# READABLE > DECLARATIVE: An if/elif/else structure is more explicit than a complex one-liner.
-./my_backup_script.sh
-EXIT_CODE=$?
+#### Web Services
+```go
+// BAD: Everything in one handler
+func userHandler(w http.ResponseWriter, r *http.Request) {
+    if r.Method == "GET" {
+        // 50 lines of GET logic
+    } else if r.Method == "POST" {
+        // 80 lines of POST logic
+    }
+    // More methods...
+}
 
-if [ $EXIT_CODE -eq 0 ]; then
-  echo "Backup successful."
-  ./run_cleanup.sh
-elif [ $EXIT_CODE -eq 2 ]; then
-  echo "Warning: Backup completed with minor, non-fatal errors."
-else
-  echo "CRITICAL: Backup failed with exit code $EXIT_CODE." >&2
-  exit 1
-fi
-# Trying to achieve this with `&&` and `||` would be cryptic and error-prone.
+// GOOD: Separation of concerns
+type UserHandler struct {
+    userService UserService
+    validator   Validator
+    logger      Logger
+}
+
+func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+    switch r.Method {
+    case http.MethodGet:
+        h.handleGet(w, r)
+    case http.MethodPost:
+        h.handleCreate(w, r)
+    default:
+        h.respondError(w, http.StatusMethodNotAllowed, "Method not allowed")
+    }
+}
+
+func (h *UserHandler) handleGet(w http.ResponseWriter, r *http.Request) {
+    ctx := r.Context()
+    userID := chi.URLParam(r, "userID")
+    
+    user, err := h.userService.GetByID(ctx, userID)
+    if err != nil {
+        h.handleServiceError(w, err)
+        return
+    }
+    
+    h.respondJSON(w, http.StatusOK, user)
+}
+
+// Reusable response helpers
+func (h *UserHandler) respondJSON(w http.ResponseWriter, status int, data interface{}) {
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(status)
+    
+    if err := json.NewEncoder(w).Encode(data); err != nil {
+        h.logger.Error("Failed to encode response", "error", err)
+    }
+}
 ```
 
------
+#### Cloud Technologies (AWS/GCP/Azure)
+```python
+# BAD: Hardcoded, no error handling, no retry
+import boto3
 
-### **3. Imperative & Too Declarative Code (To Avoid)**
+def upload_file(file_path):
+    s3 = boto3.client('s3')
+    s3.upload_file(file_path, 'my-bucket', 'file.txt')
 
-For completeness, you should continue to avoid these two anti-patterns as previously defined.
+# GOOD: Configurable, resilient, observable
+import boto3
+from botocore.exceptions import ClientError
+from typing import Optional
+import logging
+from tenacity import retry, stop_after_attempt, wait_exponential
 
-  * **Imperative Code:** The verbose, manual, step-by-step style that is hard to maintain (e.g., manual data validation loops).
-  * **Too Declarative Code:** The esoteric style where an abstraction makes simple tasks more complex (e.g., using a reactive stream library for a simple array map, or point-free composition that obscures intent).
+class S3FileUploader:
+    def __init__(self, 
+                 bucket_name: str,
+                 region: str = 'us-east-1',
+                 logger: Optional[logging.Logger] = None):
+        self.bucket_name = bucket_name
+        self.s3_client = boto3.client('s3', region_name=region)
+        self.logger = logger or logging.getLogger(__name__)
+    
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10)
+    )
+    def upload_file(self, 
+                    local_path: str, 
+                    s3_key: str,
+                    metadata: Optional[dict] = None) -> str:
+        """
+        Upload file to S3 with automatic retry and error handling.
+        
+        Returns:
+            S3 object URL on success
+        
+        Raises:
+            S3UploadError: If upload fails after retries
+        """
+        try:
+            extra_args = {}
+            if metadata:
+                extra_args['Metadata'] = metadata
+            
+            self.logger.info(f"Uploading {local_path} to s3://{self.bucket_name}/{s3_key}")
+            
+            self.s3_client.upload_file(
+                Filename=local_path,
+                Bucket=self.bucket_name,
+                Key=s3_key,
+                ExtraArgs=extra_args
+            )
+            
+            url = f"https://{self.bucket_name}.s3.amazonaws.com/{s3_key}"
+            self.logger.info(f"Successfully uploaded to {url}")
+            return url
+            
+        except ClientError as e:
+            error_code = e.response['Error']['Code']
+            self.logger.error(f"S3 upload failed: {error_code}", exc_info=True)
+            raise S3UploadError(f"Failed to upload to S3: {error_code}") from e
+```
+
+### Complexity Scaling Patterns
+
+#### 1. Configuration Management
+```typescript
+// Simple: Direct configuration
+const API_URL = "https://api.example.com";
+
+// Medium: Environment-based
+interface Config {
+    apiUrl: string;
+    timeout: number;
+    retryAttempts: number;
+}
+
+const config: Config = {
+    apiUrl: process.env.API_URL || "https://api.example.com",
+    timeout: parseInt(process.env.TIMEOUT || "5000"),
+    retryAttempts: parseInt(process.env.RETRY_ATTEMPTS || "3")
+};
+
+// Complex: Full configuration system
+class ConfigurationManager {
+    private static instance: ConfigurationManager;
+    private config: Map<string, any> = new Map();
+    
+    static getInstance(): ConfigurationManager {
+        if (!this.instance) {
+            this.instance = new ConfigurationManager();
+        }
+        return this.instance;
+    }
+    
+    loadFromEnvironment(): void {
+        this.loadDefaults();
+        this.overrideFromEnv();
+        this.validateConfig();
+    }
+    
+    get<T>(key: string, defaultValue?: T): T {
+        if (!this.config.has(key) && defaultValue === undefined) {
+            throw new ConfigurationError(`Missing required configuration: ${key}`);
+        }
+        return this.config.get(key) ?? defaultValue;
+    }
+}
+```
+
+#### 2. Error Handling Evolution
+```rust
+// Simple: Basic Result
+fn divide(a: f64, b: f64) -> Result<f64, String> {
+    if b == 0.0 {
+        Err("Division by zero".to_string())
+    } else {
+        Ok(a / b)
+    }
+}
+
+// Medium: Custom error types
+#[derive(Debug)]
+enum MathError {
+    DivisionByZero,
+    Overflow,
+    InvalidInput(String),
+}
+
+fn divide(a: f64, b: f64) -> Result<f64, MathError> {
+    if b == 0.0 {
+        Err(MathError::DivisionByZero)
+    } else {
+        Ok(a / b)
+    }
+}
+
+// Complex: Full error handling with context
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum CalculationError {
+    #[error("Division by zero attempted with numerator {numerator}")]
+    DivisionByZero { numerator: f64 },
+    
+    #[error("Calculation overflow: {expression}")]
+    Overflow { expression: String },
+    
+    #[error("Invalid input: {message}")]
+    InvalidInput { message: String, source: Box<dyn std::error::Error> },
+}
+
+pub struct Calculator {
+    precision: u32,
+    allow_infinity: bool,
+}
+
+impl Calculator {
+    pub fn divide(&self, a: f64, b: f64) -> Result<f64, CalculationError> {
+        if b == 0.0 {
+            if self.allow_infinity {
+                Ok(f64::INFINITY)
+            } else {
+                Err(CalculationError::DivisionByZero { numerator: a })
+            }
+        } else {
+            Ok((a / b).round_to(self.precision))
+        }
+    }
+}
+```
+
+### Testing Patterns
+
+```python
+# BAD: Untestable code
+class EmailService:
+    def send_welcome_email(self, user_id):
+        user = database.query(f"SELECT * FROM users WHERE id = {user_id}")
+        smtp = smtplib.SMTP('smtp.gmail.com', 587)
+        smtp.send_message(f"Welcome {user.name}!")
+
+# GOOD: Testable with dependency injection
+class EmailService:
+    def __init__(self, user_repository: UserRepository, 
+                 email_sender: EmailSender):
+        self.user_repository = user_repository
+        self.email_sender = email_sender
+    
+    async def send_welcome_email(self, user_id: str) -> None:
+        user = await self.user_repository.get_by_id(user_id)
+        if not user:
+            raise UserNotFoundError(f"User {user_id} not found")
+        
+        message = WelcomeEmailTemplate.render(user=user)
+        await self.email_sender.send(
+            to=user.email,
+            subject="Welcome to our platform!",
+            body=message
+        )
+
+# Easy to test:
+async def test_send_welcome_email():
+    mock_repo = Mock(UserRepository)
+    mock_sender = Mock(EmailSender)
+    service = EmailService(mock_repo, mock_sender)
+    
+    mock_repo.get_by_id.return_value = User(id="123", name="Test")
+    
+    await service.send_welcome_email("123")
+    
+    mock_sender.send.assert_called_once()
+```
+
+### Performance Code (Only When Requested)
+
+```go
+// When asked for performance optimization:
+// "Make this CSV parser faster for large files"
+
+// Performance-focused version with comments explaining trade-offs
+func ParseLargeCSV(filename string) ([][]string, error) {
+    // Pre-allocate with estimated capacity to avoid reallocations
+    // Trade-off: Uses more memory upfront
+    estimatedRows := 1_000_000
+    results := make([][]string, 0, estimatedRows)
+    
+    file, err := os.Open(filename)
+    if err != nil {
+        return nil, err
+    }
+    defer file.Close()
+    
+    // Use buffered reader for better I/O performance
+    // Buffer size tuned for typical L2 cache size
+    reader := bufio.NewReaderSize(file, 256*1024)
+    
+    // Reuse the same slice for each line to reduce allocations
+    // Trade-off: More complex code, harder to maintain
+    lineBuffer := make([]byte, 0, 4096)
+    
+    for {
+        lineBuffer = lineBuffer[:0] // Reset buffer
+        
+        // Read line into reusable buffer
+        line, isPrefix, err := reader.ReadLine()
+        if err == io.EOF {
+            break
+        }
+        if err != nil {
+            return nil, err
+        }
+        
+        lineBuffer = append(lineBuffer, line...)
+        
+        // Handle lines longer than buffer
+        for isPrefix {
+            line, isPrefix, err = reader.ReadLine()
+            if err != nil {
+                return nil, err
+            }
+            lineBuffer = append(lineBuffer, line...)
+        }
+        
+        // Parse CSV line manually for speed
+        // Trade-off: Doesn't handle all CSV edge cases
+        fields := fastSplitCSV(lineBuffer)
+        results = append(results, fields)
+    }
+    
+    return results, nil
+}
+
+// Comment explaining why this is faster but less maintainable
+// than using encoding/csv
+```
+
+### Code Review Mental Model
+
+Before submitting code, ask:
+
+1. **Can a junior developer understand this without explanation?**
+2. **Can this code be unit tested without modifying it?**
+3. **If this breaks at 3 AM, are the error messages helpful?**
+4. **Does each function have a single, clear purpose?**
+5. **Are edge cases handled explicitly?**
+
+### Common Pitfalls to Avoid
+
+1. **Premature abstraction**: Don't create interfaces until you have 2+ implementations
+2. **Clever one-liners**: If it needs a comment to explain, it's too clever
+3. **Deep nesting**: More than 3 levels usually means extract a function
+4. **Giant functions**: If it doesn't fit on one screen, split it
+5. **Ignoring errors**: Always handle or explicitly propagate
+
+Remember: Code is written once but read many times. Optimize for the reader, not the writer.
