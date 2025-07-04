@@ -12,6 +12,7 @@
 - Use test driven development (TDD), write test first, run them, let it fail, do the implementation so that test pass. Don't change test in implementation phase
 - Prefer running single tests, and not the whole test suite, for performance
 - Break task in small todos before implementation, confirm before implementing todos
+- Clean the temporary files after use
 
 # Using Gemini CLI for Large Codebase Analysis
 
