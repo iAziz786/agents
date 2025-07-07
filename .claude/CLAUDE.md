@@ -13,6 +13,7 @@
 - Prefer running single tests, and not the whole test suite, for performance
 - Break task in small todos before implementation, confirm before implementing todos
 - Clean the temporary files after use
+- Always ask follow up questions for better clarification for the requirements
 
 # Using Gemini CLI for Large Codebase Analysis
 
